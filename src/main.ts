@@ -116,6 +116,20 @@ function isOwnOutputSelected(): boolean {
   return ownOutputId !== null && selection.length === 1 && selection[0].id === ownOutputId;
 }
 
+async function publishPreview(id: string, mine: number): Promise<void> {
+  try {
+    const node = await findSource(id);
+    if (!node || mine !== revision) return;
+    const width = node.width;
+    const height = node.height;
+    const png = await exportSource(node, Math.min(2, 600 / width, 400 / height));
+    if (mine !== revision) return;
+    post({ type: 'selection-preview', revision: mine, png, width, height });
+  } catch {
+    return;
+  }
+}
+
 async function publishSelection(): Promise<void> {
   revision += 1;
   const mine = revision;
@@ -125,6 +139,7 @@ async function publishSelection(): Promise<void> {
       if (mine !== revision) return;
       if (stillThere) {
         post({ type: 'selection-state', revision: mine, source: currentSource, error: null });
+        await publishPreview(currentSource.id, mine);
         return;
       }
     }
@@ -132,6 +147,7 @@ async function publishSelection(): Promise<void> {
     const state = evaluateSelection();
     currentSource = state.source;
     post({ type: 'selection-state', revision: mine, source: state.source, error: state.error });
+    if (state.source) await publishPreview(state.source.id, mine);
   } catch (error) {
     if (mine !== revision) return;
     currentSource = null;
@@ -305,7 +321,7 @@ function handleMessage(message: unknown): void {
   }
 }
 
-figma.showUI(__html__, { width: 360, height: 480, themeColors: false });
+figma.showUI(__html__, { width: 360, height: 560, themeColors: false });
 figma.ui.onmessage = handleMessage;
 figma.on('selectionchange', () => {
   void publishSelection();
