@@ -86,6 +86,10 @@ test('isMainToUi accepts one valid sample per message type', () => {
   );
   assert.equal(isMainToUi({ type: 'create-success', requestId: 'r1', name: 'Photo stroke' }), true);
   assert.equal(isMainToUi({ type: 'create-error', requestId: null, error: 'Failed.' }), true);
+  assert.equal(
+    isMainToUi({ type: 'selection-preview', revision: 2, png, width: 120.5, height: 80 }),
+    true,
+  );
 });
 
 test('isMainToUi rejects invalid samples per message type', () => {
@@ -103,6 +107,10 @@ test('isMainToUi rejects invalid samples per message type', () => {
   );
   assert.equal(isMainToUi({ type: 'create-success', requestId: 'r1' }), false);
   assert.equal(isMainToUi({ type: 'create-error', requestId: 7, error: 'Failed.' }), false);
+  assert.equal(isMainToUi({ type: 'selection-preview', revision: 2, png: [1, 2], width: 120, height: 80 }), false);
+  assert.equal(isMainToUi({ type: 'selection-preview', revision: 2, png, width: 0, height: 80 }), false);
+  assert.equal(isMainToUi({ type: 'selection-preview', revision: 2, png, width: 120, height: NaN }), false);
+  assert.equal(isMainToUi({ type: 'selection-preview', png, width: 120, height: 80 }), false);
 });
 
 test('isUiToMain accepts one valid sample per message type', () => {

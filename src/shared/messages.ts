@@ -10,7 +10,8 @@ export type MainToUi =
   | { type: 'selection-state'; revision: number; source: { id: string; name: string } | null; error: string | null }
   | { type: 'source-ready'; requestId: string; settings: StrokeSettings; plan: ExportPlan; png: Uint8Array }
   | { type: 'create-success'; requestId: string; name: string }
-  | { type: 'create-error'; requestId: string | null; error: string };
+  | { type: 'create-error'; requestId: string | null; error: string }
+  | { type: 'selection-preview'; revision: number; png: Uint8Array; width: number; height: number };
 
 export type UiToMain =
   | { type: 'ui-ready' }
@@ -58,6 +59,10 @@ function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
 
+function isPositiveNumber(value: unknown): value is number {
+  return isNumber(value) && value > 0;
+}
+
 function isSource(value: unknown): boolean {
   return value === null || (isRecord(value) && isString(value.id) && isString(value.name));
 }
@@ -78,6 +83,13 @@ export function isMainToUi(value: unknown): value is MainToUi {
       return isString(value.requestId) && isString(value.name);
     case 'create-error':
       return (value.requestId === null || isString(value.requestId)) && isString(value.error);
+    case 'selection-preview':
+      return (
+        isNumber(value.revision) &&
+        value.png instanceof Uint8Array &&
+        isPositiveNumber(value.width) &&
+        isPositiveNumber(value.height)
+      );
     default:
       return false;
   }
