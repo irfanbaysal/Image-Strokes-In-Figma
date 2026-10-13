@@ -1,6 +1,8 @@
-import type { MainToUi, StrokeSettings, UiToMain } from '../shared/messages.ts';
+import type { MainToUi, OutputKind, StrokeSettings, UiToMain } from '../shared/messages.ts';
 import { isMainToUi } from '../shared/messages.ts';
 import { renderStroke } from '../image/stroke.ts';
+import { traceContours } from '../image/trace.ts';
+import { buildOutline, toPathData } from '../image/simplify.ts';
 import { previewLayout } from './preview.ts';
 import { IDENTITY_VIEW, ZOOM_MAX, clampView, panBy, zoomAt } from './view.ts';
 import type { View } from './view.ts';
@@ -35,7 +37,8 @@ const zoomFitButton = byId<HTMLButtonElement>('zoom-fit');
 const previewEmpty = byId<HTMLElement>('preview-empty');
 const previewNote = byId<HTMLElement>('preview-note');
 const sourceLine = byId<HTMLElement>('source');
-const createButton = byId<HTMLButtonElement>('create');
+const imageButton = byId<HTMLButtonElement>('create-image');
+const vectorButton = byId<HTMLButtonElement>('create-vector');
 const message = byId<HTMLElement>('message');
 
 const state = {
@@ -48,6 +51,7 @@ const state = {
   source: null as Source | null,
   revision: 0,
   runningId: null as string | null,
+  runningKind: null as OutputKind | null,
   selected: null as { id: string; bitmap: ImageBitmap; size: { width: number; height: number } } | null,
 };
 
@@ -253,8 +257,11 @@ function attachPreviewInput(): void {
 
 function updateButton(): void {
   const running = state.runningId !== null;
-  createButton.textContent = running ? 'Creating…' : 'Create Stroke';
-  createButton.disabled = running || !state.source || !state.widthValid || !state.colorValid;
+  imageButton.textContent = running && state.runningKind === 'image' ? 'Creating…' : 'Create As Image';
+  vectorButton.textContent = running && state.runningKind === 'vector' ? 'Creating…' : 'Create As Vector';
+  const disabled = running || !state.source || !state.widthValid || !state.colorValid;
+  imageButton.disabled = disabled;
+  vectorButton.disabled = disabled;
 }
 
 function applyWidthDraft(text: string): void {
@@ -326,14 +333,15 @@ function onSelectionPreview(msg: Extract<MainToUi, { type: 'selection-preview' }
   );
 }
 
-function onCreateClick(): void {
-  if (createButton.disabled || state.runningId !== null || !state.source) return;
+function onCreateClick(output: OutputKind): void {
+  if (imageButton.disabled || state.runningId !== null || !state.source) return;
   const requestId = newRequestId();
   state.runningId = requestId;
+  state.runningKind = output;
   setMessage('', '');
   updateButton();
   const settings: StrokeSettings = { width: state.lastWidth, color: state.lastColor };
-  post({ type: 'create-request', requestId, sourceNodeId: state.source.id, selectionRevision: state.revision, settings });
+  post({ type: 'create-request', requestId, sourceNodeId: state.source.id, selectionRevision: state.revision, settings, output });
 }
 
 function nextFrame(): Promise<void> {
@@ -374,9 +382,41 @@ async function render(msg: SourceReady): Promise<void> {
   post({ type: 'render-result', requestId, png, width: canvas.width, height: canvas.height });
 }
 
+async function renderVector(msg: SourceReady): Promise<void> {
+  const { plan, requestId } = msg;
+  await nextFrame();
+  const bitmap = await createImageBitmap(new Blob([msg.png as Uint8Array<ArrayBuffer>], { type: 'image/png' }), { colorSpaceConversion: 'none' });
+  const canvas = document.createElement('canvas');
+  canvas.width = plan.width;
+  canvas.height = plan.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('Canvas is not available.');
+  ctx.drawImage(bitmap, plan.padding, plan.padding);
+  bitmap.close();
+  const pixels = ctx.getImageData(0, 0, plan.width, plan.height).data;
+  const alpha = new Uint8ClampedArray(plan.width * plan.height);
+  for (let i = 0; i < alpha.length; i++) alpha[i] = pixels[i * 4 + 3] ?? 0;
+  const contours = traceContours(alpha, plan.width, plan.height);
+  if (contours.length === 0) {
+    post({ type: 'render-error', requestId, error: 'The image is fully transparent.' });
+    return;
+  }
+  const outline = buildOutline(contours);
+  if (!outline) {
+    post({ type: 'render-error', requestId, error: 'The image is too detailed for a vector outline.' });
+    return;
+  }
+  const data = toPathData(outline.contours, plan.scale, { x: plan.padding, y: plan.padding });
+  post({ type: 'vector-result', requestId, data });
+}
+
 function onSourceReady(msg: SourceReady): void {
   if (msg.requestId !== state.runningId) return;
-  render(msg).catch((error: unknown) => {
+  if (msg.output !== state.runningKind) {
+    post({ type: 'render-error', requestId: msg.requestId, error: 'Unexpected job type.' });
+    return;
+  }
+  (msg.output === 'vector' ? renderVector(msg) : render(msg)).catch((error: unknown) => {
     const text = error instanceof Error && error.message ? error.message : 'Rendering failed.';
     post({ type: 'render-error', requestId: msg.requestId, error: text });
   });
@@ -385,6 +425,7 @@ function onSourceReady(msg: SourceReady): void {
 function finishJob(requestId: string | null, text: string, kind: 'error' | 'success'): void {
   if (requestId !== null && requestId !== state.runningId) return;
   state.runningId = null;
+  state.runningKind = null;
   setMessage(text, kind);
   updateButton();
 }
@@ -414,7 +455,7 @@ function onMessage(event: MessageEvent): void {
 }
 
 function onEnter(event: KeyboardEvent): void {
-  if (event.key === 'Enter' && !createButton.disabled) onCreateClick();
+  if (event.key === 'Enter' && !imageButton.disabled) onCreateClick('image');
 }
 
 function init(): void {
@@ -441,7 +482,8 @@ function init(): void {
   });
   widthInput.addEventListener('keydown', onEnter);
   hexInput.addEventListener('keydown', onEnter);
-  createButton.addEventListener('click', onCreateClick);
+  imageButton.addEventListener('click', () => onCreateClick('image'));
+  vectorButton.addEventListener('click', () => onCreateClick('vector'));
   window.addEventListener('message', onMessage);
   attachPreviewInput();
   schedulePreview();
