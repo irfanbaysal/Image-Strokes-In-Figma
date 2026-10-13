@@ -14,7 +14,6 @@ Technical changes per release. Versions follow [Semantic Versioning](https://sem
 - Message protocol: `OutputKind` (`'image' | 'vector'`) and the `vector-result` message from the panel to the plugin thread.
 - `scripts/vector-figure.mjs`: renders `docs/features/vector.png` from the tracing code with headless Chrome.
 - Unit tests for tracing, simplification, path validation and the new protocol fields (51 tests before, 78 now).
-- Packaging: the built plugin is published as `@irfanbaysal/image-strokes-in-figma` on GitHub Packages (`manifest.json`, `dist/main.js`, `dist/ui.html`). The package metadata and the `Publish package` workflow were added after the `v0.2.0` tag; the plugin code in the package is the tagged code.
 
 ### Changed
 

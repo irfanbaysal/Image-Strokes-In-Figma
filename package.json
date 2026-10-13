@@ -1,26 +1,9 @@
 {
-  "name": "@irfanbaysal/image-strokes-in-figma",
-  "version": "0.2.0",
-  "description": "Figma plugin that outlines raster images along their alpha silhouette, as a flat image or as an editable vector stroke.",
-  "license": "MIT",
-  "author": "İrfan Yiğit BAYSAL",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/irfanbaysal/Image-Strokes-In-Figma.git"
-  },
-  "homepage": "https://github.com/irfanbaysal/Image-Strokes-In-Figma#readme",
-  "bugs": {
-    "url": "https://github.com/irfanbaysal/Image-Strokes-In-Figma/issues"
-  },
-  "keywords": ["figma", "figma-plugin", "stroke", "outline", "image", "vector"],
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
+  "name": "image-strokes-in-figma",
+  "private": true,
   "type": "module",
-  "files": ["manifest.json", "dist/main.js", "dist/ui.html", "CHANGELOG.md"],
   "scripts": {
     "build": "node scripts/build.mjs",
-    "prepack": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
     "typecheck": "tsc --noEmit",
     "test": "node --test \"tests/**/*.test.ts\""
