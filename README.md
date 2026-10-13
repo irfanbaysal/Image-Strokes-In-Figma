@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1>Figma Strokes</h1>
+<h1>Image Strokes In Figma</h1>
 
 <hr>
 
@@ -75,7 +75,7 @@ npm install
 npm run build
 ```
 
-Then in Figma: **Plugins → Development → Import plugin from manifest…** and pick `manifest.json` from this folder. Select an image, run *Figma Strokes*, press Create Stroke.
+Then in Figma: **Plugins → Development → Import plugin from manifest…** and pick `manifest.json` from this folder. Select an image, run *Image Strokes In Figma*, press Create Stroke.
 
 `dist/` is gitignored, so you need to build before Figma can load it.
 
