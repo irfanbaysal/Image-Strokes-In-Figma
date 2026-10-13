@@ -1,6 +1,8 @@
 import type { MainToUi, StrokeSettings, UiToMain } from '../shared/messages.ts';
 import { isMainToUi } from '../shared/messages.ts';
 import { renderStroke } from '../image/stroke.ts';
+import { previewLayout } from './preview.ts';
+import sampleUrl from './preview-sample.png';
 import { createColorPicker } from './picker.ts';
 import { attachScrub } from './scrub.ts';
 import { COLOR_DEFAULT, WIDTH_DEFAULT, WIDTH_MAX, WIDTH_MIN, hexToRgb, parseHex, parseWidth } from '../image/validation.ts';
@@ -8,7 +10,9 @@ import { COLOR_DEFAULT, WIDTH_DEFAULT, WIDTH_MAX, WIDTH_MIN, hexToRgb, parseHex,
 type Source = { id: string; name: string };
 type SourceReady = Extract<MainToUi, { type: 'source-ready' }>;
 
-const PREVIEW_MAX_STROKE = 26;
+const PREVIEW_BOX = { width: 300, height: 100 };
+const SAMPLE_HEIGHT = 56;
+const SAMPLE_SIZE = { width: (SAMPLE_HEIGHT * 135) / 208, height: SAMPLE_HEIGHT };
 
 function byId<T extends Element>(id: string): T {
   const el = document.getElementById(id);
@@ -23,7 +27,7 @@ const widthLabel = byId<HTMLElement>('width-label');
 const pickerHost = byId<HTMLElement>('color-picker');
 const hexInput = byId<HTMLInputElement>('color-hex');
 const colorError = byId<HTMLElement>('color-error');
-const outline = byId<SVGPathElement>('outline');
+const previewCanvas = byId<HTMLCanvasElement>('preview-canvas');
 const previewNote = byId<HTMLElement>('preview-note');
 const sourceLine = byId<HTMLElement>('source');
 const createButton = byId<HTMLButtonElement>('create');
@@ -63,12 +67,48 @@ function setMessage(text: string, kind: 'error' | 'success' | ''): void {
   message.className = kind ? `message ${kind}` : 'message';
 }
 
+let sample: HTMLImageElement | null = null;
+let frame = 0;
+
+function schedulePreview(): void {
+  if (frame) return;
+  frame = requestAnimationFrame(() => {
+    frame = 0;
+    drawPreview();
+  });
+}
+
+function loadSample(): void {
+  const img = new Image();
+  img.src = sampleUrl;
+  img.decode().then(
+    () => {
+      sample = img;
+      schedulePreview();
+    },
+    () => {},
+  );
+}
+
 function drawPreview(): void {
-  const drawn = Math.min(state.lastWidth, PREVIEW_MAX_STROKE);
-  outline.setAttribute('stroke-width', String(drawn * 2));
-  outline.setAttribute('stroke', state.lastColor);
-  outline.setAttribute('fill', state.lastColor);
-  previewNote.style.visibility = drawn === state.lastWidth ? 'hidden' : 'visible';
+  if (!sample) return;
+  const ctx = previewCanvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.round(PREVIEW_BOX.width * dpr);
+  const h = Math.round(PREVIEW_BOX.height * dpr);
+  if (previewCanvas.width !== w) previewCanvas.width = w;
+  if (previewCanvas.height !== h) previewCanvas.height = h;
+  const layout = previewLayout(state.lastWidth, PREVIEW_BOX, SAMPLE_SIZE);
+  previewNote.style.visibility = layout.scale < 1 ? 'visible' : 'hidden';
+  ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  const dw = layout.imageWidth * dpr;
+  const dh = layout.imageHeight * dpr;
+  ctx.drawImage(sample, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  const out = renderStroke(ctx.getImageData(0, 0, w, h), layout.radius * dpr, hexToRgb(state.lastColor));
+  if (out) ctx.putImageData(new ImageData(out.data as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
 }
 
 function updateButton(): void {
@@ -83,7 +123,7 @@ function applyWidthDraft(text: string): void {
   state.widthValid = result.ok;
   if (result.ok) state.lastWidth = result.value;
   setFieldError(widthInput, widthError, result.ok ? null : result.error);
-  drawPreview();
+  schedulePreview();
   updateButton();
 }
 
@@ -97,7 +137,7 @@ function applyHexDraft(text: string): void {
     picker.setColor(result.value);
   }
   setFieldError(hexInput, colorError, result.ok ? null : result.error);
-  drawPreview();
+  schedulePreview();
   updateButton();
 }
 
@@ -110,7 +150,7 @@ function applySwatch(value: string): void {
   hexInput.value = result.value;
   swatch.style.backgroundColor = result.value;
   setFieldError(hexInput, colorError, null);
-  drawPreview();
+  schedulePreview();
   updateButton();
 }
 
@@ -235,7 +275,7 @@ function init(): void {
   hexInput.addEventListener('keydown', onEnter);
   createButton.addEventListener('click', onCreateClick);
   window.addEventListener('message', onMessage);
-  drawPreview();
+  loadSample();
   updateButton();
   post({ type: 'ui-ready' });
 }
