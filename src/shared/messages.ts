@@ -1,5 +1,7 @@
 import type { ExportPlan } from '../image/validation.ts';
-import { parseHex, parseWidth } from '../image/validation.ts';
+import { isVectorPathData, parseHex, parseWidth } from '../image/validation.ts';
+
+export type OutputKind = 'image' | 'vector';
 
 export interface StrokeSettings {
   width: number;
@@ -8,15 +10,16 @@ export interface StrokeSettings {
 
 export type MainToUi =
   | { type: 'selection-state'; revision: number; source: { id: string; name: string } | null; error: string | null }
-  | { type: 'source-ready'; requestId: string; settings: StrokeSettings; plan: ExportPlan; png: Uint8Array }
+  | { type: 'source-ready'; requestId: string; settings: StrokeSettings; plan: ExportPlan; png: Uint8Array; output: OutputKind }
   | { type: 'create-success'; requestId: string; name: string }
   | { type: 'create-error'; requestId: string | null; error: string }
   | { type: 'selection-preview'; revision: number; png: Uint8Array; width: number; height: number };
 
 export type UiToMain =
   | { type: 'ui-ready' }
-  | { type: 'create-request'; requestId: string; sourceNodeId: string; selectionRevision: number; settings: StrokeSettings }
+  | { type: 'create-request'; requestId: string; sourceNodeId: string; selectionRevision: number; settings: StrokeSettings; output: OutputKind }
   | { type: 'render-result'; requestId: string; png: Uint8Array; width: number; height: number }
+  | { type: 'vector-result'; requestId: string; data: string }
   | { type: 'render-error'; requestId: string; error: string };
 
 type Fields = Record<string, unknown>;
@@ -63,6 +66,10 @@ function isPositiveNumber(value: unknown): value is number {
   return isNumber(value) && value > 0;
 }
 
+function isOutputKind(value: unknown): value is OutputKind {
+  return value === 'image' || value === 'vector';
+}
+
 function isSource(value: unknown): boolean {
   return value === null || (isRecord(value) && isString(value.id) && isString(value.name));
 }
@@ -77,7 +84,8 @@ export function isMainToUi(value: unknown): value is MainToUi {
         isString(value.requestId) &&
         isStrokeSettings(value.settings) &&
         isExportPlan(value.plan) &&
-        value.png instanceof Uint8Array
+        value.png instanceof Uint8Array &&
+        isOutputKind(value.output)
       );
     case 'create-success':
       return isString(value.requestId) && isString(value.name);
@@ -105,7 +113,8 @@ export function isUiToMain(value: unknown): value is UiToMain {
         isString(value.requestId) &&
         isString(value.sourceNodeId) &&
         isNumber(value.selectionRevision) &&
-        isStrokeSettings(value.settings)
+        isStrokeSettings(value.settings) &&
+        isOutputKind(value.output)
       );
     case 'render-result':
       return (
@@ -114,6 +123,8 @@ export function isUiToMain(value: unknown): value is UiToMain {
         isPositiveInteger(value.width) &&
         isPositiveInteger(value.height)
       );
+    case 'vector-result':
+      return isString(value.requestId) && isVectorPathData(value.data);
     case 'render-error':
       return isString(value.requestId) && isString(value.error);
     default:

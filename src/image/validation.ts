@@ -5,6 +5,7 @@ export const COLOR_DEFAULT = '#0095FF';
 export const MAX_AXIS = 4096;
 export const MAX_PIXELS = 8_000_000;
 export const OUTPUT_GAP = 32;
+export const MAX_PATH_CHARS = 400_000;
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string };
 
@@ -65,12 +66,16 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   };
 }
 
-export function planExport(nodeWidth: number, nodeHeight: number, strokeWidth: number): Result<ExportPlan> {
+function planWithPadding(
+  nodeWidth: number,
+  nodeHeight: number,
+  paddingFor: (scale: 1 | 2) => number,
+): Result<ExportPlan> {
   if (!(nodeWidth > 0) || !(nodeHeight > 0) || !Number.isFinite(nodeWidth) || !Number.isFinite(nodeHeight)) {
     return { ok: false, error: SIZE_ERROR };
   }
   for (const scale of [2, 1] as const) {
-    const padding = Math.ceil(strokeWidth * scale) + 2;
+    const padding = paddingFor(scale);
     const width = Math.ceil(nodeWidth * scale) + 2 * padding;
     const height = Math.ceil(nodeHeight * scale) + 2 * padding;
     if (width <= MAX_AXIS && height <= MAX_AXIS && width * height <= MAX_PIXELS) {
@@ -78,4 +83,58 @@ export function planExport(nodeWidth: number, nodeHeight: number, strokeWidth: n
     }
   }
   return { ok: false, error: TOO_LARGE_ERROR };
+}
+
+export function planExport(nodeWidth: number, nodeHeight: number, strokeWidth: number): Result<ExportPlan> {
+  return planWithPadding(nodeWidth, nodeHeight, (scale) => Math.ceil(strokeWidth * scale) + 2);
+}
+
+export function planVectorExport(nodeWidth: number, nodeHeight: number): Result<ExportPlan> {
+  return planWithPadding(nodeWidth, nodeHeight, () => 2);
+}
+
+function isDigit(code: number): boolean {
+  return code >= 48 && code <= 57;
+}
+
+export function isVectorPathData(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_PATH_CHARS) return false;
+  const length = value.length;
+  let pos = 0;
+
+  const char = (code: string): boolean => {
+    if (pos < length && value[pos] === code) {
+      pos += 1;
+      return true;
+    }
+    return false;
+  };
+
+  const digits = (): boolean => {
+    const start = pos;
+    while (pos < length && isDigit(value.charCodeAt(pos))) pos += 1;
+    return pos > start;
+  };
+
+  const number = (): boolean => {
+    char('-');
+    if (!digits()) return false;
+    return !char('.') || digits();
+  };
+
+  const point = (): boolean => char(' ') && number() && char(' ') && number();
+
+  for (;;) {
+    if (!char('M') || !point()) return false;
+    let points = 1;
+    for (;;) {
+      if (!char(' ')) return false;
+      if (char('Z')) break;
+      if (!char('L') || !point()) return false;
+      points += 1;
+    }
+    if (points < 3) return false;
+    if (pos === length) return true;
+    if (!char(' ')) return false;
+  }
 }
