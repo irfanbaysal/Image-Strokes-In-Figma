@@ -53,7 +53,7 @@ The UI is one self-contained HTML file and only talks to the plugin thread throu
 
 - **Width**: a whole number from 1 to 200, in document units. Drag the *Width* label left or right to change it; hold Shift to move in steps of 10.
 - **Color**: the swatch opens a picker with a saturation/brightness area, a hue slider and preset swatches. Where the browser supports the EyeDropper API there is also an eyedropper button. The HEX field next to the swatch accepts `#RGB` and `#RRGGBB`.
-- **Preview**: the image you have selected, stroked with the same code that produces the real result and drawn at its true proportion, so a thin stroke on a large image looks thin. When image and stroke do not fit the box at full size the preview shrinks and says "Preview at N%". With nothing usable selected it shows a bundled sample image instead.
+- **Preview**: the image you have selected, stroked with the same code that produces the real result and drawn at its true proportion, so a thin stroke on a large image looks thin. When image and stroke do not fit the box at full size the preview shrinks and says "Preview at N%". With nothing usable selected it shows a bundled sample image instead. Scroll (or use the − and + buttons) to zoom up to 8x, drag to pan, double-click or press Fit to go back.
 - **Create Stroke**: makes a new layer named `<source name> — Stroke`, 32 units to the right of the source, and selects it. The source is left untouched and the panel stays open.
 
 Changing settings never writes to the document; only Create Stroke does.
@@ -95,7 +95,8 @@ src/ui/index.html        panel markup
 src/ui/main.ts           panel logic: fields, preview, render jobs, messages
 src/ui/scrub.ts          drag-the-label number scrubbing
 src/ui/picker.ts         color picker (+ picker.css)
-src/ui/preview.ts        preview layout: fits the stroked sample into the box
+src/ui/preview.ts        preview layout: fits the stroked image into the box
+src/ui/view.ts           preview zoom and pan math
 src/ui/preview-sample.png  bundled sample image for the preview
 tests/                   unit tests for stroke, validation, scrub and preview
 ```
