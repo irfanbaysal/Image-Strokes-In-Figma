@@ -305,7 +305,7 @@ function handleMessage(message: unknown): void {
   }
 }
 
-figma.showUI(__html__, { width: 360, height: 440, themeColors: false });
+figma.showUI(__html__, { width: 360, height: 480, themeColors: false });
 figma.ui.onmessage = handleMessage;
 figma.on('selectionchange', () => {
   void publishSelection();
