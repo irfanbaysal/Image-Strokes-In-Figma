@@ -6,7 +6,8 @@
 
 <p><strong>Outlines for raster images; a Figma plugin written in plain TypeScript.</strong><br>
 Adds a stroke around an image that follows the picture's alpha silhouette,<br>
-not the rectangle it sits in. No framework, no image library, no network. Open source, offline, and yours.</p>
+not the rectangle it sits in. Baked into a new image, or as an <strong>editable vector stroke</strong>.<br>
+No framework, no image library, no network. Open source, offline, and yours.</p>
 
 <p>
 <img alt="100% TypeScript" src="https://img.shields.io/badge/100%25-TypeScript-3178c6?style=flat-square&logo=typescript&logoColor=white">
@@ -27,6 +28,18 @@ Select one image, pick a width and a color, press Create As Image or Create As V
 Figma strokes vectors natively, but a stroke on an image layer only follows the rectangle, not the picture inside it. This plugin traces what is actually visible in the image instead.
 
 ## Features
+
+### A real vector stroke, not a picture of one
+
+<img src="docs/features/vector.png" alt="Three panels: the image's silhouette traced into a vector path of 123 points with its anchor points shown; the same path with a blue stroke of weight 10 under the image; the same vector restyled with a thicker pink stroke" width="820">
+
+<p><em>The silhouette traced into a path, the stroke Figma draws on it, and the same vector after a change of weight and color. Rendered from the plugin's own tracing code (<code>node scripts/vector-figure.mjs</code>); the restyled panel illustrates an edit you would make in Figma.</em></p>
+
+**Create As Vector** does not flatten anything. It traces the outline of what is visible in the image into a vector path, puts a native Figma stroke on that path, and groups it under a copy of the image. Because the stroke is Figma's own, it is still yours to change afterwards: drag the weight, pick another color, switch the join, or run Outline Stroke to turn it into a plain shape. It scales without going soft, and holes inside the image are traced too.
+
+**Create As Image** is still there when you want one flat layer with the outline baked in.
+
+### In the panel
 
 Every screenshot below is the real plugin UI, rendered headless from the same build you install (`node scripts/screenshots.mjs`).
 
@@ -134,7 +147,8 @@ Worth knowing:
 manifest.json            Figma manifest (dynamic-page, no network)
 scripts/build.mjs        esbuild: src/main.ts → dist/main.js, src/ui/* → dist/ui.html
 scripts/cover.mjs        renders docs/cover.png (animated) from docs/cover-source.png
-scripts/screenshots.mjs  renders docs/features/*.png from the built panel with headless Chrome
+scripts/screenshots.mjs  renders the panel screenshots in docs/features/ with headless Chrome
+scripts/vector-figure.mjs  renders docs/features/vector.png from the tracing code
 src/main.ts              plugin thread: selection checks, export, job lifecycle, creates the layer or the vector group
 src/shared/messages.ts   message protocol between the two sides, with runtime guards
 src/image/validation.ts  width and HEX parsing, size limits, export planning, path data checks
@@ -161,7 +175,7 @@ A few things worth knowing if you dig in:
 
 ## Status
 
-v0.1.0, early alpha. It builds, type-checks and passes its unit tests, and the panel has been exercised in a browser. In Figma the panel opens and picks up the selection; creating a stroke has not been verified there yet.
+v0.1.0, early alpha. It builds, type-checks and passes its unit tests, and the panel has been exercised in a browser. In Figma the panel opens, previews the selection, and Create As Vector has been tried by hand and produced a correct, editable result. Nothing beyond that has been tested systematically there.
 
 Open questions: whether creating the layer is a single Undo step, how rotated or cropped sources and sources inside Auto Layout or scaled parents behave, how the eyedropper behaves in Figma desktop, and how it performs on large images.
 
