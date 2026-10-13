@@ -4,7 +4,6 @@ import { renderStroke } from '../image/stroke.ts';
 import { previewLayout } from './preview.ts';
 import { IDENTITY_VIEW, ZOOM_MAX, clampView, panBy, zoomAt } from './view.ts';
 import type { View } from './view.ts';
-import sampleUrl from './preview-sample.png';
 import { createColorPicker } from './picker.ts';
 import { attachScrub } from './scrub.ts';
 import { COLOR_DEFAULT, WIDTH_DEFAULT, WIDTH_MAX, WIDTH_MIN, hexToRgb, parseHex, parseWidth } from '../image/validation.ts';
@@ -13,8 +12,6 @@ type Source = { id: string; name: string };
 type SourceReady = Extract<MainToUi, { type: 'source-ready' }>;
 
 const PREVIEW_BOX = { width: 326, height: 196 };
-const SAMPLE_HEIGHT = 56;
-const SAMPLE_SIZE = { width: (SAMPLE_HEIGHT * 135) / 208, height: SAMPLE_HEIGHT };
 
 function byId<T extends Element>(id: string): T {
   const el = document.getElementById(id);
@@ -35,6 +32,7 @@ const zoomControls = byId<HTMLElement>('zoom-controls');
 const zoomOutButton = byId<HTMLButtonElement>('zoom-out');
 const zoomInButton = byId<HTMLButtonElement>('zoom-in');
 const zoomFitButton = byId<HTMLButtonElement>('zoom-fit');
+const previewEmpty = byId<HTMLElement>('preview-empty');
 const previewNote = byId<HTMLElement>('preview-note');
 const sourceLine = byId<HTMLElement>('source');
 const createButton = byId<HTMLButtonElement>('create');
@@ -75,7 +73,6 @@ function setMessage(text: string, kind: 'error' | 'success' | ''): void {
   message.className = kind ? `message ${kind}` : 'message';
 }
 
-let sample: HTMLImageElement | null = null;
 let frame = 0;
 
 function schedulePreview(): void {
@@ -86,18 +83,6 @@ function schedulePreview(): void {
   });
 }
 
-function loadSample(): void {
-  const img = new Image();
-  img.src = sampleUrl;
-  img.decode().then(
-    () => {
-      sample = img;
-      schedulePreview();
-    },
-    () => {},
-  );
-}
-
 let view: View = IDENTITY_VIEW;
 let dragging = false;
 let work: HTMLCanvasElement | null = null;
@@ -105,11 +90,9 @@ const MAX_PIXELS = 4_000_000;
 
 function geometry() {
   const selected = state.selected;
-  const bitmap = selected ? selected.bitmap : sample;
-  if (!bitmap) return null;
-  const size = selected ? selected.size : SAMPLE_SIZE;
-  const layout = previewLayout(state.lastWidth, PREVIEW_BOX, size, 14);
-  return { bitmap, layout, image: { width: layout.imageWidth, height: layout.imageHeight } };
+  if (!selected) return null;
+  const layout = previewLayout(state.lastWidth, PREVIEW_BOX, selected.size, 14);
+  return { bitmap: selected.bitmap, layout, image: { width: layout.imageWidth, height: layout.imageHeight } };
 }
 
 function setView(next: View): void {
@@ -138,9 +121,22 @@ function panView(dx: number, dy: number): void {
 
 function drawPreview(): void {
   const g = geometry();
-  if (!g) return;
-  const { bitmap, layout } = g;
   const ctx = previewCanvas.getContext('2d', { willReadFrequently: true });
+  previewEmpty.style.display = state.source ? 'none' : 'block';
+  if (!g) {
+    dragging = false;
+    if (ctx) ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    previewNote.style.visibility = 'hidden';
+    zoomControls.style.display = 'none';
+    previewBox.style.cursor = '';
+    previewBox.tabIndex = -1;
+    previewBox.setAttribute('aria-label', 'Preview. Select an image to see it here.');
+    return;
+  }
+  zoomControls.style.display = '';
+  previewBox.tabIndex = 0;
+  previewBox.setAttribute('aria-label', 'Preview. Scroll to zoom, drag to pan.');
+  const { bitmap, layout } = g;
   if (!ctx) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.round(PREVIEW_BOX.width * dpr);
@@ -186,6 +182,7 @@ function attachPreviewInput(): void {
   previewBox.addEventListener(
     'wheel',
     (event) => {
+      if (!state.selected) return;
       event.preventDefault();
       const k = event.ctrlKey ? 0.01 : 0.0015;
       zoomBy(Math.exp(-event.deltaY * k), boxPoint(event));
@@ -194,7 +191,7 @@ function attachPreviewInput(): void {
   );
   let last = { x: 0, y: 0 };
   previewBox.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) return;
+    if (event.button !== 0 || !state.selected) return;
     dragging = true;
     last = { x: event.clientX, y: event.clientY };
     previewBox.setPointerCapture(event.pointerId);
@@ -213,9 +210,11 @@ function attachPreviewInput(): void {
   previewBox.addEventListener('pointerup', endDrag);
   previewBox.addEventListener('pointercancel', endDrag);
   previewBox.addEventListener('lostpointercapture', endDrag);
-  previewBox.addEventListener('dblclick', resetView);
+  previewBox.addEventListener('dblclick', () => {
+    if (state.selected) resetView();
+  });
   previewBox.addEventListener('keydown', (event) => {
-    if (event.target !== previewBox || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (!state.selected || event.target !== previewBox || event.ctrlKey || event.metaKey || event.altKey) return;
     const origin = { x: 0, y: 0 };
     switch (event.key) {
       case '+':
@@ -303,6 +302,7 @@ function onSelectionState(msg: Extract<MainToUi, { type: 'selection-state' }>): 
     resetView();
   }
   state.revision = msg.revision;
+  schedulePreview();
   sourceLine.textContent = msg.source ? msg.source.name : (msg.error ?? '');
   updateButton();
 }
@@ -444,7 +444,7 @@ function init(): void {
   createButton.addEventListener('click', onCreateClick);
   window.addEventListener('message', onMessage);
   attachPreviewInput();
-  loadSample();
+  schedulePreview();
   updateButton();
   post({ type: 'ui-ready' });
 }
