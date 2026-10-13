@@ -3,30 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Image Stroke</title>
+<title>Figma Strokes</title>
 <!--STYLES-->
 </head>
 <body>
 <main class="panel">
-  <h1>Image Stroke</h1>
+  <h1>Figma Strokes</h1>
   <div class="preview-wrap">
   <div class="preview" id="preview">
     <svg width="300" height="100" viewBox="0 0 300 100" aria-hidden="true" focusable="false">
-      <path id="wave" d="M 30 50 C 75 12, 105 12, 150 50 S 225 88, 270 50" fill="none" stroke="#0095FF" stroke-width="10" stroke-linecap="butt" />
+      <path id="outline" d="M 147 34 Q 150 26 153 34 C 155 44 165 48 176 47 Q 184 50 176 53 C 165 52 155 56 153 66 Q 150 74 147 66 C 145 56 135 52 124 53 Q 116 50 124 47 C 135 48 145 44 147 34 Z" fill="#0095FF" stroke="#0095FF" stroke-width="20" stroke-linejoin="round" />
+      <path d="M 147 34 Q 150 26 153 34 C 155 44 165 48 176 47 Q 184 50 176 53 C 165 52 155 56 153 66 Q 150 74 147 66 C 145 56 135 52 124 53 Q 116 50 124 47 C 135 48 145 44 147 34 Z" fill="#E6E6E6" />
     </svg>
   </div>
   <span class="caption" id="preview-note">Preview scaled</span>
   </div>
   <div class="row">
     <div class="field">
-      <label for="width">Width</label>
+      <label for="width" id="width-label" title="Drag to change">Width</label>
       <input id="width" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="width-error">
       <span class="field-error" id="width-error"></span>
     </div>
     <div class="field">
       <label for="color-hex">Color</label>
       <div class="color-row">
-        <input id="color-swatch" type="color" aria-label="Color swatch">
+        <button id="color-swatch" type="button" class="swatch" aria-label="Choose color"></button>
         <input id="color-hex" type="text" autocomplete="off" spellcheck="false" aria-describedby="color-error">
       </div>
       <span class="field-error" id="color-error"></span>
@@ -35,6 +36,7 @@
   <p class="source" id="source"></p>
   <button id="create" type="button" class="primary" disabled>Create Stroke</button>
   <p class="message" id="message" role="status" aria-live="polite"></p>
+  <div id="color-picker" class="picker-popover" hidden></div>
 </main>
 <!--SCRIPT-->
 </body>

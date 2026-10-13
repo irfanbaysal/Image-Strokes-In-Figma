@@ -1,12 +1,14 @@
 import type { MainToUi, StrokeSettings, UiToMain } from '../shared/messages.ts';
 import { isMainToUi } from '../shared/messages.ts';
 import { renderStroke } from '../image/stroke.ts';
-import { COLOR_DEFAULT, WIDTH_DEFAULT, hexToRgb, parseHex, parseWidth } from '../image/validation.ts';
+import { createColorPicker } from './picker.ts';
+import { attachScrub } from './scrub.ts';
+import { COLOR_DEFAULT, WIDTH_DEFAULT, WIDTH_MAX, WIDTH_MIN, hexToRgb, parseHex, parseWidth } from '../image/validation.ts';
 
 type Source = { id: string; name: string };
 type SourceReady = Extract<MainToUi, { type: 'source-ready' }>;
 
-const PREVIEW_MAX_STROKE = 36;
+const PREVIEW_MAX_STROKE = 26;
 
 function byId<T extends Element>(id: string): T {
   const el = document.getElementById(id);
@@ -16,10 +18,12 @@ function byId<T extends Element>(id: string): T {
 
 const widthInput = byId<HTMLInputElement>('width');
 const widthError = byId<HTMLElement>('width-error');
-const swatch = byId<HTMLInputElement>('color-swatch');
+const swatch = byId<HTMLButtonElement>('color-swatch');
+const widthLabel = byId<HTMLElement>('width-label');
+const pickerHost = byId<HTMLElement>('color-picker');
 const hexInput = byId<HTMLInputElement>('color-hex');
 const colorError = byId<HTMLElement>('color-error');
-const wave = byId<SVGPathElement>('wave');
+const outline = byId<SVGPathElement>('outline');
 const previewNote = byId<HTMLElement>('preview-note');
 const sourceLine = byId<HTMLElement>('source');
 const createButton = byId<HTMLButtonElement>('create');
@@ -36,6 +40,8 @@ const state = {
   revision: 0,
   runningId: null as string | null,
 };
+
+const picker = createColorPicker({ anchor: swatch, host: pickerHost, initial: COLOR_DEFAULT, onInput: applySwatch });
 
 function post(msg: UiToMain): void {
   parent.postMessage({ pluginMessage: msg }, '*');
@@ -59,8 +65,9 @@ function setMessage(text: string, kind: 'error' | 'success' | ''): void {
 
 function drawPreview(): void {
   const drawn = Math.min(state.lastWidth, PREVIEW_MAX_STROKE);
-  wave.setAttribute('stroke-width', String(drawn));
-  wave.setAttribute('stroke', state.lastColor);
+  outline.setAttribute('stroke-width', String(drawn * 2));
+  outline.setAttribute('stroke', state.lastColor);
+  outline.setAttribute('fill', state.lastColor);
   previewNote.style.visibility = drawn === state.lastWidth ? 'hidden' : 'visible';
 }
 
@@ -86,7 +93,8 @@ function applyHexDraft(text: string): void {
   state.colorValid = result.ok;
   if (result.ok) {
     state.lastColor = result.value;
-    swatch.value = result.value.toLowerCase();
+    swatch.style.backgroundColor = result.value;
+    picker.setColor(result.value);
   }
   setFieldError(hexInput, colorError, result.ok ? null : result.error);
   drawPreview();
@@ -100,6 +108,7 @@ function applySwatch(value: string): void {
   state.colorValid = true;
   state.colorDraft = result.value;
   hexInput.value = result.value;
+  swatch.style.backgroundColor = result.value;
   setFieldError(hexInput, colorError, null);
   drawPreview();
   updateButton();
@@ -203,7 +212,7 @@ function onEnter(event: KeyboardEvent): void {
 function init(): void {
   widthInput.value = state.widthDraft;
   hexInput.value = state.colorDraft;
-  swatch.value = state.lastColor.toLowerCase();
+  swatch.style.backgroundColor = state.lastColor;
   widthInput.addEventListener('input', () => applyWidthDraft(widthInput.value));
   hexInput.addEventListener('input', () => applyHexDraft(hexInput.value));
   hexInput.addEventListener('blur', () => {
@@ -212,7 +221,16 @@ function init(): void {
       hexInput.value = state.lastColor;
     }
   });
-  swatch.addEventListener('input', () => applySwatch(swatch.value));
+  attachScrub({
+    handle: widthLabel,
+    min: WIDTH_MIN,
+    max: WIDTH_MAX,
+    getValue: () => state.lastWidth,
+    onChange: (value) => {
+      widthInput.value = String(value);
+      applyWidthDraft(widthInput.value);
+    },
+  });
   widthInput.addEventListener('keydown', onEnter);
   hexInput.addEventListener('keydown', onEnter);
   createButton.addEventListener('click', onCreateClick);
