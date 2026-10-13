@@ -55,6 +55,7 @@ async function buildOnce() {
       target: 'es2020',
       minify: true,
       write: false,
+      loader: { '.png': 'dataurl' },
       logLevel: 'silent',
     }),
   ]);
