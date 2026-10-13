@@ -6,7 +6,7 @@
 
 <p><strong>Outlines for raster images; a Figma plugin written in plain TypeScript.</strong><br>
 Adds a stroke around an image that follows the picture's alpha silhouette,<br>
-not the rectangle it sits in. Baked into a new image, or as an <strong>editable vector stroke</strong>.<br>
+not the rectangle it sits in. Two outputs: <strong>a flat image</strong> with the outline baked in, or <strong>an editable vector stroke</strong>.<br>
 No framework, no image library, no network. Open source, offline, and yours.</p>
 
 <p>
@@ -29,15 +29,48 @@ Figma strokes vectors natively, but a stroke on an image layer only follows the 
 
 ## Features
 
+### Two outputs: an image or a vector
+
+The panel has two buttons, and they give you the same outline in two different forms. Same width, same color, same silhouette; pick by what you want to do with the result afterwards.
+
+<table>
+<tr>
+<td width="50%" valign="top">
+
+#### Create As Image
+
+One new raster layer: the image with the outline baked into it.
+
+- A single flat layer, nothing to keep together.
+- Looks the same wherever it goes: exports, handoff, other tools.
+- The edge is anti-aliased pixel by pixel.
+- To change the width or color, create it again.
+
+</td>
+<td width="50%" valign="top">
+
+#### Create As Vector
+
+A group: a vector with a native Figma stroke, under a copy of the image.
+
+- The stroke stays editable in Figma: weight, color, join.
+- Scales to any size without going soft.
+- Run Outline Stroke on it to get a plain shape.
+- Two layers in a group instead of one.
+
+</td>
+</tr>
+</table>
+
+Either way the source image is left untouched and the result lands next to it.
+
 ### A real vector stroke, not a picture of one
 
 <img src="docs/features/vector.png" alt="Three panels: the image's silhouette traced into a vector path of 123 points with its anchor points shown; the same path with a blue stroke of weight 10 under the image; the same vector restyled with a thicker pink stroke" width="820">
 
 <p><em>The silhouette traced into a path, the stroke Figma draws on it, and the same vector after a change of weight and color. Rendered from the plugin's own tracing code (<code>node scripts/vector-figure.mjs</code>); the restyled panel illustrates an edit you would make in Figma.</em></p>
 
-**Create As Vector** does not flatten anything. It traces the outline of what is visible in the image into a vector path, puts a native Figma stroke on that path, and groups it under a copy of the image. Because the stroke is Figma's own, it is still yours to change afterwards: drag the weight, pick another color, switch the join, or run Outline Stroke to turn it into a plain shape. It scales without going soft, and holes inside the image are traced too.
-
-**Create As Image** is still there when you want one flat layer with the outline baked in.
+**Create As Vector** does not flatten anything. It traces the outline of what is visible in the image into a vector path, puts a native Figma stroke on that path, and groups it under a copy of the image. Because the stroke is Figma's own, it is still yours to change afterwards: drag the weight, pick another color, switch the join, or run Outline Stroke to turn it into a plain shape. Holes inside the image are traced too.
 
 ### In the panel
 
