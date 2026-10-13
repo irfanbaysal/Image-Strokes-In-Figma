@@ -1,4 +1,4 @@
-# Image Stroke
+# Figma Strokes
 
 A Figma plugin that adds an outward stroke to an image, following the image's alpha
 silhouette instead of its bounding box.
