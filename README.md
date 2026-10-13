@@ -214,7 +214,7 @@ A few things worth knowing if you dig in:
 
 ## Status
 
-v0.1.0, early alpha. It builds, type-checks and passes its unit tests, and the panel has been exercised in a browser. In Figma the panel opens, previews the selection, and Create As Vector has been tried by hand and produced a correct, editable result. Nothing beyond that has been tested systematically there.
+v0.2.0, early alpha; what changed in each version is in [CHANGELOG.md](CHANGELOG.md). It builds, type-checks and passes its unit tests, and the panel has been exercised in a browser. In Figma the panel opens, previews the selection, and Create As Vector has been tried by hand and produced a correct, editable result. Nothing beyond that has been tested systematically there.
 
 Open questions: whether creating the layer is a single Undo step, how rotated or cropped sources and sources inside Auto Layout or scaled parents behave, how the eyedropper behaves in Figma desktop, and how it performs on large images.
 
