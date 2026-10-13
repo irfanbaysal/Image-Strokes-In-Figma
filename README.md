@@ -62,6 +62,12 @@ A group: a vector with a native Figma stroke, under a copy of the image.
 </tr>
 </table>
 
+<p align="center">
+<img src="docs/features/panel.png" alt="The plugin panel in Figma: the selected image previewed with a white outline, Width 24, Color #FFFFFF, and the two buttons Create As Image and Create As Vector side by side" width="356">
+</p>
+
+<p align="center"><em>The panel in Figma, with both buttons.</em></p>
+
 Either way the source image is left untouched and the result lands next to it.
 
 ### A real vector stroke, not a picture of one
