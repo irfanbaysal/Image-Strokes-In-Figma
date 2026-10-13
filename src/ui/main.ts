@@ -10,7 +10,7 @@ import { COLOR_DEFAULT, WIDTH_DEFAULT, WIDTH_MAX, WIDTH_MIN, hexToRgb, parseHex,
 type Source = { id: string; name: string };
 type SourceReady = Extract<MainToUi, { type: 'source-ready' }>;
 
-const PREVIEW_BOX = { width: 300, height: 100 };
+const PREVIEW_BOX = { width: 300, height: 180 };
 const SAMPLE_HEIGHT = 56;
 const SAMPLE_SIZE = { width: (SAMPLE_HEIGHT * 135) / 208, height: SAMPLE_HEIGHT };
 
@@ -43,6 +43,7 @@ const state = {
   source: null as Source | null,
   revision: 0,
   runningId: null as string | null,
+  selected: null as { id: string; bitmap: ImageBitmap; size: { width: number; height: number } } | null,
 };
 
 const picker = createColorPicker({ anchor: swatch, host: pickerHost, initial: COLOR_DEFAULT, onInput: applySwatch });
@@ -91,7 +92,10 @@ function loadSample(): void {
 }
 
 function drawPreview(): void {
-  if (!sample) return;
+  const selected = state.selected;
+  const bitmap = selected ? selected.bitmap : sample;
+  if (!bitmap) return;
+  const size = selected ? selected.size : SAMPLE_SIZE;
   const ctx = previewCanvas.getContext('2d', { willReadFrequently: true });
   if (!ctx) return;
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -99,14 +103,15 @@ function drawPreview(): void {
   const h = Math.round(PREVIEW_BOX.height * dpr);
   if (previewCanvas.width !== w) previewCanvas.width = w;
   if (previewCanvas.height !== h) previewCanvas.height = h;
-  const layout = previewLayout(state.lastWidth, PREVIEW_BOX, SAMPLE_SIZE);
+  const layout = previewLayout(state.lastWidth, PREVIEW_BOX, size);
+  previewNote.textContent = selected ? `Preview at ${Math.max(1, Math.round(layout.scale * 100))}%` : 'Preview scaled';
   previewNote.style.visibility = layout.scale < 1 ? 'visible' : 'hidden';
   ctx.clearRect(0, 0, w, h);
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
   const dw = layout.imageWidth * dpr;
   const dh = layout.imageHeight * dpr;
-  ctx.drawImage(sample, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  ctx.drawImage(bitmap, (w - dw) / 2, (h - dh) / 2, dw, dh);
   const out = renderStroke(ctx.getImageData(0, 0, w, h), layout.radius * dpr, hexToRgb(state.lastColor));
   if (out) ctx.putImageData(new ImageData(out.data as Uint8ClampedArray<ArrayBuffer>, out.width, out.height), 0, 0);
 }
@@ -156,9 +161,33 @@ function applySwatch(value: string): void {
 
 function onSelectionState(msg: Extract<MainToUi, { type: 'selection-state' }>): void {
   state.source = msg.source;
+  if (state.selected && (!msg.source || msg.source.id !== state.selected.id)) {
+    state.selected.bitmap.close();
+    state.selected = null;
+    schedulePreview();
+  }
   state.revision = msg.revision;
   sourceLine.textContent = msg.source ? msg.source.name : (msg.error ?? '');
   updateButton();
+}
+
+function onSelectionPreview(msg: Extract<MainToUi, { type: 'selection-preview' }>): void {
+  const source = state.source;
+  if (msg.revision !== state.revision || !source) return;
+  const id = source.id;
+  const revision = msg.revision;
+  createImageBitmap(new Blob([msg.png as Uint8Array<ArrayBuffer>], { type: 'image/png' })).then(
+    (bitmap) => {
+      if (revision !== state.revision || !state.source) {
+        bitmap.close();
+        return;
+      }
+      state.selected?.bitmap.close();
+      state.selected = { id, bitmap, size: { width: msg.width, height: msg.height } };
+      schedulePreview();
+    },
+    () => {},
+  );
 }
 
 function onCreateClick(): void {
@@ -232,6 +261,9 @@ function onMessage(event: MessageEvent): void {
   switch (payload.type) {
     case 'selection-state':
       onSelectionState(payload);
+      break;
+    case 'selection-preview':
+      onSelectionPreview(payload);
       break;
     case 'source-ready':
       onSourceReady(payload);
