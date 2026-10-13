@@ -1,6 +1,6 @@
 import type { ExportPlan } from './image/validation.ts';
-import { OUTPUT_GAP, parseHex, parseWidth, planExport } from './image/validation.ts';
-import type { MainToUi, StrokeSettings, UiToMain } from './shared/messages.ts';
+import { OUTPUT_GAP, hexToRgb, isVectorPathData, parseHex, parseWidth, planExport, planVectorExport } from './image/validation.ts';
+import type { MainToUi, OutputKind, StrokeSettings, UiToMain } from './shared/messages.ts';
 import { isUiToMain } from './shared/messages.ts';
 
 interface SourceInfo {
@@ -19,6 +19,7 @@ interface SourceSnapshot {
 interface Job {
   requestId: string;
   revision: number;
+  output: OutputKind;
   settings: StrokeSettings;
   plan: ExportPlan;
   snapshot: SourceSnapshot;
@@ -28,6 +29,7 @@ interface Job {
 
 type CreateRequest = Extract<UiToMain, { type: 'create-request' }>;
 type RenderResult = Extract<UiToMain, { type: 'render-result' }>;
+type VectorResult = Extract<UiToMain, { type: 'vector-result' }>;
 type RenderError = Extract<UiToMain, { type: 'render-error' }>;
 
 const JOB_TIMEOUT_MS = 30000;
@@ -213,6 +215,7 @@ async function handleCreateRequest(message: CreateRequest): Promise<void> {
   const placeholder: Job = {
     requestId,
     revision: message.selectionRevision,
+    output: message.output,
     settings,
     plan: { scale: 1, padding: 0, width: 0, height: 0 },
     snapshot: { id: '', width: 0, height: 0, fills: '', transform: '' },
@@ -225,7 +228,9 @@ async function handleCreateRequest(message: CreateRequest): Promise<void> {
     if (!source) throw new Error('The selected image no longer exists.');
     const error = sourceError(source);
     if (error !== null) throw new Error(error);
-    const plan = planExport(source.width, source.height, settings.width);
+    const plan = message.output === 'vector'
+      ? planVectorExport(source.width, source.height)
+      : planExport(source.width, source.height, settings.width);
     if (!plan.ok) throw new Error(plan.error);
     placeholder.plan = plan.value;
     placeholder.snapshot = takeSnapshot(source);
@@ -234,7 +239,7 @@ async function handleCreateRequest(message: CreateRequest): Promise<void> {
     if (revision !== placeholder.revision) throw new Error('The selection changed. Try again.');
     placeholder.rendering = true;
     armTimeout(requestId);
-    post({ type: 'source-ready', requestId, settings, plan: plan.value, png });
+    post({ type: 'source-ready', requestId, settings, plan: plan.value, png, output: message.output });
   } catch (error) {
     if (job === placeholder) failJob(requestId, errorText(error));
   }
@@ -281,6 +286,10 @@ async function createOutput(source: RectangleNode, current: Job, png: Uint8Array
 async function handleRenderResult(message: RenderResult): Promise<void> {
   const current = job;
   if (!current || current.requestId !== message.requestId || !current.rendering) return;
+  if (current.output !== 'image') {
+    failJob(current.requestId, 'Unexpected result for this job.');
+    return;
+  }
   try {
     if (message.width !== current.plan.width || message.height !== current.plan.height) {
       throw new Error('The rendered image has an unexpected size.');
@@ -291,6 +300,92 @@ async function handleRenderResult(message: RenderResult): Promise<void> {
       throw new Error('The selection changed. Try again.');
     }
     const name = await createOutput(source, current, message.png);
+    clearJob();
+    post({ type: 'create-success', requestId: current.requestId, name });
+  } catch (error) {
+    if (job === current) failJob(current.requestId, errorText(error));
+  }
+}
+
+function toFigmaColor(hex: string): RGB {
+  const { r, g, b } = hexToRgb(hex);
+  return { r: r / 255, g: g / 255, b: b / 255 };
+}
+
+function alignVector(vector: VectorNode, source: RectangleNode, ox: number, oy: number): void {
+  const [[a, c, tx], [b, d, ty]] = source.absoluteTransform;
+  vector.relativeTransform = [
+    [a, c, tx + a * ox + c * oy],
+    [b, d, ty + b * ox + d * oy],
+  ];
+}
+
+function moveGroup(group: GroupNode, source: RectangleNode): void {
+  const sourceBox = source.absoluteBoundingBox;
+  const groupBox = group.absoluteRenderBounds ?? group.absoluteBoundingBox;
+  if (!sourceBox || !groupBox) throw new Error('Could not measure the image position.');
+  const dx = sourceBox.x + sourceBox.width + OUTPUT_GAP - groupBox.x;
+  const dy = sourceBox.y + sourceBox.height / 2 - (groupBox.y + groupBox.height / 2);
+  group.x += dx;
+  group.y += dy;
+}
+
+function createVectorOutput(source: RectangleNode, current: Job, data: string): string {
+  const created: SceneNode[] = [];
+  try {
+    const image = source.clone();
+    created.push(image);
+    figma.currentPage.appendChild(image);
+    image.relativeTransform = source.absoluteTransform;
+    image.name = source.name;
+    const vector = figma.createVector();
+    created.push(vector);
+    figma.currentPage.appendChild(vector);
+    vector.vectorPaths = [{ windingRule: 'EVENODD', data }];
+    const ox = vector.x;
+    const oy = vector.y;
+    const paint: SolidPaint = { type: 'SOLID', color: toFigmaColor(current.settings.color) };
+    vector.fills = [paint];
+    vector.strokes = [paint];
+    vector.strokeWeight = current.settings.width * 2;
+    vector.strokeAlign = 'CENTER';
+    vector.strokeJoin = 'ROUND';
+    vector.strokeCap = 'ROUND';
+    vector.name = 'Stroke';
+    alignVector(vector, source, ox, oy);
+    const group = figma.group([vector, image], figma.currentPage);
+    created.push(group);
+    group.insertChild(0, vector);
+    group.name = `${source.name} — Stroke`;
+    moveGroup(group, source);
+    ownOutputId = group.id;
+    figma.currentPage.selection = [group];
+    figma.commitUndo();
+    return group.name;
+  } catch (error) {
+    ownOutputId = null;
+    for (const node of created) {
+      if (!node.removed) node.remove();
+    }
+    throw error;
+  }
+}
+
+async function handleVectorResult(message: VectorResult): Promise<void> {
+  const current = job;
+  if (!current || current.requestId !== message.requestId || !current.rendering) return;
+  if (current.output !== 'vector') {
+    failJob(current.requestId, 'Unexpected result for this job.');
+    return;
+  }
+  try {
+    const source = await findSource(current.snapshot.id);
+    if (job !== current) return;
+    if (!source || revision !== current.revision || !sameSnapshot(takeSnapshot(source), current.snapshot)) {
+      throw new Error('The selection changed. Try again.');
+    }
+    if (!isVectorPathData(message.data)) throw new Error('The vector outline is invalid.');
+    const name = createVectorOutput(source, current, message.data);
     clearJob();
     post({ type: 'create-success', requestId: current.requestId, name });
   } catch (error) {
@@ -314,6 +409,9 @@ function handleMessage(message: unknown): void {
       return;
     case 'render-result':
       void handleRenderResult(message);
+      return;
+    case 'vector-result':
+      void handleVectorResult(message);
       return;
     case 'render-error':
       handleRenderError(message);
