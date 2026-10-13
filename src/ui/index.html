@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Image Stroke</title>
+<!--STYLES-->
+</head>
+<body>
+<main class="panel">
+  <h1>Image Stroke</h1>
+  <div class="preview-wrap">
+  <div class="preview" id="preview">
+    <svg width="300" height="100" viewBox="0 0 300 100" aria-hidden="true" focusable="false">
+      <path id="wave" d="M 30 50 C 75 12, 105 12, 150 50 S 225 88, 270 50" fill="none" stroke="#0095FF" stroke-width="10" stroke-linecap="butt" />
+    </svg>
+  </div>
+  <span class="caption" id="preview-note">Preview scaled</span>
+  </div>
+  <div class="row">
+    <div class="field">
+      <label for="width">Width</label>
+      <input id="width" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" aria-describedby="width-error">
+      <span class="field-error" id="width-error"></span>
+    </div>
+    <div class="field">
+      <label for="color-hex">Color</label>
+      <div class="color-row">
+        <input id="color-swatch" type="color" aria-label="Color swatch">
+        <input id="color-hex" type="text" autocomplete="off" spellcheck="false" aria-describedby="color-error">
+      </div>
+      <span class="field-error" id="color-error"></span>
+    </div>
+  </div>
+  <p class="source" id="source"></p>
+  <button id="create" type="button" class="primary" disabled>Create Stroke</button>
+  <p class="message" id="message" role="status" aria-live="polite"></p>
+</main>
+<!--SCRIPT-->
+</body>
+</html>
