@@ -1,5 +1,5 @@
 import { watch } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import { build } from 'esbuild';
@@ -10,7 +10,7 @@ const distDir = path.join(root, 'dist');
 const mainEntry = path.join(srcDir, 'main.ts');
 const uiEntry = path.join(srcDir, 'ui', 'main.ts');
 const uiTemplatePath = path.join(srcDir, 'ui', 'index.html');
-const uiStylesPath = path.join(srcDir, 'ui', 'styles.css');
+const uiDir = path.join(srcDir, 'ui');
 
 const STYLES_PLACEHOLDER = '<!--STYLES-->';
 const SCRIPT_PLACEHOLDER = '<!--SCRIPT-->';
@@ -23,10 +23,14 @@ function replacePlaceholder(html, placeholder, replacement) {
 }
 
 async function buildOnce() {
-  const [template, styles] = await Promise.all([
+  const cssFiles = (await readdir(uiDir))
+    .filter((name) => name.endsWith('.css'))
+    .sort((a, b) => (a === 'styles.css' ? -1 : b === 'styles.css' ? 1 : a.localeCompare(b)));
+  const [template, ...styleParts] = await Promise.all([
     readFile(uiTemplatePath, 'utf8'),
-    readFile(uiStylesPath, 'utf8'),
+    ...cssFiles.map((name) => readFile(path.join(uiDir, name), 'utf8')),
   ]);
+  const styles = styleParts.join('\n');
   for (const placeholder of [STYLES_PLACEHOLDER, SCRIPT_PLACEHOLDER]) {
     if (!template.includes(placeholder)) {
       throw new Error(`Placeholder ${placeholder} is missing from src/ui/index.html`);
