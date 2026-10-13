@@ -26,6 +26,48 @@ Select one image, pick a width and a color, press Create Stroke, and a new layer
 
 Figma strokes vectors natively, but a stroke on an image layer only follows the rectangle, not the picture inside it. This plugin traces what is actually visible in the image instead.
 
+## Features
+
+Every screenshot below is the real plugin UI, rendered headless from the same build you install (`node scripts/screenshots.mjs`).
+
+<table>
+<tr>
+<td width="33%" valign="top">
+
+<img src="docs/features/zoom.png" alt="The preview zoomed in to 219% on the upper part of the selected image, with the zoom buttons in the corner" width="240">
+
+<p><em>Zoomed to 219%: the stroke edge up close, before anything is created.</em></p>
+
+### Zoom in on the edge
+
+A stroke is judged at its edge, and a whole image squeezed into a small box hides it. Scroll over the preview to zoom towards the cursor, up to 8x, or use the <strong>−</strong> and <strong>+</strong> buttons. The caption always says how large you are looking at it, and <strong>Fit</strong> or a double-click brings the whole image back.
+
+</td>
+<td width="33%" valign="top">
+
+<img src="docs/features/pan.png" alt="The zoomed preview dragged to the right with a closed-hand cursor, showing a different part of the image" width="240">
+
+<p><em>Same zoom, dragged across to another part of the image.</em></p>
+
+### Pan around
+
+Once you are zoomed in, drag the preview to move across the image and check the corners, the thin parts and the gaps where a stroke tends to go wrong. The arrow keys do the same when the preview has focus. Selecting another image starts again from the fitted view.
+
+</td>
+<td width="33%" valign="top">
+
+<img src="docs/features/scrub.png" alt="Dragging the Width label with a left-right arrow cursor; the width reads 40 and the preview shows a thick stroke" width="240">
+
+<p><em>Dragging the Width label: 40 and counting, the preview following.</em></p>
+
+### Scrub the width
+
+Hover the <strong>Width</strong> label and the cursor turns into a left-right arrow. Press and drag right to raise the value, left to lower it, and the preview redraws as you go. Hold Shift for steps of 10. Typing a number still works, and a plain click on the label just focuses the field.
+
+</td>
+</tr>
+</table>
+
 ## Getting it running
 
 ```sh
@@ -87,6 +129,7 @@ Worth knowing:
 manifest.json            Figma manifest (dynamic-page, no network)
 scripts/build.mjs        esbuild: src/main.ts → dist/main.js, src/ui/* → dist/ui.html
 scripts/cover.mjs        renders docs/cover.png (animated) from docs/cover-source.png
+scripts/screenshots.mjs  renders docs/features/*.png from the built panel with headless Chrome
 src/main.ts              plugin thread: selection checks, export, job lifecycle, creates the layer
 src/shared/messages.ts   message protocol between the two sides, with runtime guards
 src/image/validation.ts  width and HEX parsing, size limits, export planning (scale, padding)
